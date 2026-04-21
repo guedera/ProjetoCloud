@@ -1,5 +1,7 @@
 # ProjetoCloud — Plataforma Escalável de Pagamentos em Nuvem
 
+*ISSO AQ É RASCUNHO, PODE MUDAR DPS DO DEMAY DAR OS PAPOS*
+
 > **Curso:** Computação em Nuvem — Engenharia de Computação, Insper (2026/1)  
 > **Tema:** MVP de processamento de pagamentos sobre AWS
 
@@ -845,5 +847,3 @@ Para pagamentos neste MVP, a ordem entre pagamentos diferentes não importa (cad
 Se o grupo preferir simplicidade máxima, HTML + JavaScript puro também é válido — o enunciado permite. O importante é que o frontend seja funcional e demonstre todos os fluxos.
 
 ---
-
-*Documento de rascunho arquitetural — sujeito a revisão conforme implementação avançar.*
