@@ -172,7 +172,3 @@ ProjetoCloud/
 | Diagramas, contratos, relatórios | 🟪 Documentação (`docs/`) | tudo versionado |
 
 ---
-
-## Próximo passo
-
-Começar pela **Sprint 0** — preparar conta AWS, criar a estrutura de pastas e desenhar a arquitetura antes de escrever código.
