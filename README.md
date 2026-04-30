@@ -30,6 +30,7 @@ ProjetoCloud/
 ├── infra/                     ← anotações/diagramas da infraestrutura AWS
 ├── load-tests/                ← planos JMeter (.jmx) e resultados
 └── docs/                      ← documentação técnica e relatório final
+    └── adr/                   ← Architecture Decision Records (decisões justificadas)
 ```
 
 ---
@@ -91,6 +92,25 @@ ProjetoCloud/
 
 ---
 
+## Sprint 2.5 — Robustez & Observabilidade
+
+**Objetivo:** elevar a maturidade arquitetural do MVP. A rubrica premia *dificuldade real enfrentada* — esta sprint atinge isso adicionando idempotência, eventos de domínio, observabilidade e decisões registradas.
+
+| # | Tarefa | Onde |
+|---|--------|------|
+| 2.5.1 | Implementar **idempotência** em `POST /payments` via header `Idempotency-Key`: gravar no DynamoDB com `ConditionExpression` (`attribute_not_exists`) para evitar pagamentos duplicados em retries. | 🟩 [Repositório] em [backend/api/](backend/api/) |
+| 2.5.2 | Publicar **eventos de domínio** (`PaymentApproved`, `PaymentRejected`) no **EventBridge** a partir do worker, após atualizar o status. | 🟩 [Repositório] em [backend/worker/](backend/worker/) + 🟦 [AWS Console] (event bus) |
+| 2.5.3 | Criar uma regra simples no EventBridge que registre os eventos em um log group do CloudWatch (consumidor de exemplo, demonstra o desacoplamento). | 🟦 [AWS Console] |
+| 2.5.4 | Validar **DLQ**: forçar falhas no worker (ex.: payload inválido) e mostrar mensagens chegando em `payments-dlq`. Documentar como reprocessar. | 🟨 [Local] + 🟪 [Documentação] em [docs/operacao.md](docs/operacao.md) |
+| 2.5.5 | Adicionar **logs estruturados** (JSON) em todas as Lambdas com `correlationId` propagado da API até o worker. | 🟩 [Repositório] |
+| 2.5.6 | Criar **dashboard CloudWatch** com: latência p95/p99 do API Gateway, invocações e erros das Lambdas, `ApproximateNumberOfMessagesVisible` e `ApproximateAgeOfOldestMessage` da SQS, throttling do DynamoDB. | 🟦 [AWS Console] |
+| 2.5.7 | Criar **alarme CloudWatch** em pelo menos uma métrica crítica (ex.: idade da mensagem mais antiga > 60s, ou taxa de erro 5xx > 1%). | 🟦 [AWS Console] |
+| 2.5.8 | Escrever **ADR-001** (SQS Standard vs FIFO) e **ADR-002** (DynamoDB vs RDS) justificando as decisões técnicas. | 🟪 [Documentação] em [docs/adr/](docs/adr/) |
+
+**Entrega:** sistema com idempotência, eventos de domínio, DLQ testada, observabilidade real e decisões arquiteturais documentadas.
+
+---
+
 ## Sprint 3 — Consulta de pagamentos e listagens
 
 **Objetivo:** completar os fluxos de leitura para que o painel administrativo (Sprint 4) tenha o que exibir.
@@ -142,6 +162,23 @@ ProjetoCloud/
 
 ---
 
+## Sprint 5.5 — Tuning baseado em carga (antes/depois)
+
+**Objetivo:** transformar o teste de carga em **evidência de engenharia**, não só medição. A rubrica avalia "dificuldade efetivamente enfrentada" — esta sprint mostra um problema identificado, uma intervenção e a validação do resultado.
+
+| # | Tarefa | Onde |
+|---|--------|------|
+| 5.5.1 | A partir do dashboard CloudWatch + relatório JMeter da Sprint 5, **identificar o gargalo principal** (candidatos típicos: Lambda concurrency, DynamoDB throttling, SQS visibility timeout, batch size do worker, cold start). | 🟪 [Documentação] em [docs/relatorio-carga.md](docs/relatorio-carga.md) |
+| 5.5.2 | Escrever **ADR-003** descrevendo o gargalo, hipóteses e a intervenção escolhida. | 🟪 [Documentação] em [docs/adr/](docs/adr/) |
+| 5.5.3 | Aplicar a intervenção. Exemplos: aumentar `reserved concurrency` do worker, mudar DynamoDB para `on-demand`, ajustar `batch size`/`maximum batching window` do trigger SQS, aumentar memória da Lambda, habilitar `provisioned concurrency` na API. | 🟦 [AWS Console] |
+| 5.5.4 | **Re-executar** os mesmos planos JMeter da Sprint 5 e exportar novos relatórios. | 🟨 [Local] |
+| 5.5.5 | Produzir comparativo **antes vs. depois**: gráficos de latência p95/p99, taxa de erro, profundidade da fila. | 🟪 [Documentação] em [docs/relatorio-carga.md](docs/relatorio-carga.md) |
+| 5.5.6 | Concluir com lições aprendidas e próximos limites observados (próximo gargalo se a carga subir mais). | 🟪 [Documentação] |
+
+**Entrega:** evidência concreta de problema → diagnóstico → correção → validação. É isso que move a nota da faixa "funciona" para a faixa "maturidade".
+
+---
+
 ## Sprint 6 — Documentação final, vídeo e entrega
 
 **Objetivo:** consolidar entregáveis para a apresentação.
@@ -170,5 +207,8 @@ ProjetoCloud/
 | Frontend (painel) | 🟩 Repositório | hospedagem opcional em S3 (🟦) |
 | Planos de teste JMeter | 🟩 Repositório | execução em 🟨 Local |
 | Diagramas, contratos, relatórios | 🟪 Documentação (`docs/`) | tudo versionado |
+| ADRs (decisões arquiteturais) | 🟪 Documentação (`docs/adr/`) | um arquivo por decisão |
+| EventBridge (event bus + regras) | 🟦 AWS Console | introduzido na Sprint 2.5 |
+| Dashboard e alarmes CloudWatch | 🟦 AWS Console | introduzidos na Sprint 2.5 |
 
 ---
