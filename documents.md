@@ -97,6 +97,41 @@ Arquivo de referência: [docs/arquitetura.md](docs/arquitetura.md)
 
 ---
 
+## Infraestrutura criada
+
+### Sprint 1
+| Recurso | Nome | Detalhes |
+|---------|------|----------|
+| DynamoDB | `Users` | Partition key: `userId` (String), on-demand |
+| Lambda | `payments-api` | Python 3.12, handler: `lambda_function.lambda_handler` |
+| API Gateway | `payments-api` | REST, estágio `dev`, CORS habilitado |
+| IAM Policy | `lambda-users-dynamodb` | `PutItem` + `GetItem` em `Users`, `PutItem` + `GetItem` + `Query` em `Payments`, `SendMessage` em `payments-queue` |
+
+### Sprint 2
+| Recurso | Nome | Detalhes |
+|---------|------|----------|
+| DynamoDB | `Payments` | Partition key: `paymentId` (String), on-demand |
+| SQS | `payments-queue` | Standard, DLQ: `payments-dlq`, max receives: 5 |
+| SQS | `payments-dlq` | Standard |
+| Lambda | `payments-worker` | Python 3.12, trigger: `payments-queue`, batch size: 1 |
+| IAM Policy | `lambda-worker-permissions` | `ReceiveMessage` + `DeleteMessage` + `GetQueueAttributes` em `payments-queue`, `UpdateItem` em `Payments` |
+
+### Variáveis de ambiente
+
+**payments-api:**
+| Variável | Valor |
+|----------|-------|
+| `USERS_TABLE` | `Users` |
+| `PAYMENTS_TABLE` | `Payments` |
+| `PAYMENTS_QUEUE_URL` | URL da `payments-queue` (salva no `.env`) |
+
+**payments-worker:**
+| Variável | Valor |
+|----------|-------|
+| `PAYMENTS_TABLE` | `Payments` |
+
+---
+
 ## Contratos de API
 
 Base URL: `https://<api-id>.execute-api.us-east-1.amazonaws.com/dev`

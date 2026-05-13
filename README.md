@@ -47,8 +47,8 @@ ProjetoCloud/
 | 0.2 | Configurar AWS CLI localmente (`aws configure`) com chaves do usuário IAM criado. | 🟨 [Local] |
 | 0.3 | Definir região padrão do projeto (sugestão: `us-east-1`) e documentar. | 🟪 [Documentação] |
 | 0.4 | Criar estrutura de pastas vazia conforme árvore acima (`backend/`, `frontend/`, `infra/`, `load-tests/`, `docs/`). | 🟩 [Repositório] |
-| 0.5 | Desenhar diagrama de arquitetura inicial (API Gateway → Lambda → DynamoDB + SQS → Lambda Worker). | 🟪 [Documentação] em [docs/arquitetura.md](docs/arquitetura.md) |
-| 0.6 | Definir contratos das APIs (rotas, payloads, status codes) — só no papel. | 🟪 [Documentação] em [docs/api-contract.md](docs/api-contract.md) |
+| 0.5 | Desenhar diagrama de arquitetura inicial (API Gateway → Lambda → DynamoDB + SQS → Lambda Worker). | 🟪 [Documentação] em [documents.md](documents.md) |
+| 0.6 | Definir contratos das APIs (rotas, payloads, status codes) — só no papel. | 🟪 [Documentação] em [documents.md](documents.md) |
 
 **Entrega:** repositório organizado, conta AWS pronta, arquitetura desenhada e contratos de API definidos.
 
