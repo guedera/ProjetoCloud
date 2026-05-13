@@ -5,6 +5,22 @@ O objetivo é construir um **MVP** de plataforma de pagamentos na AWS com cadast
 
 > **Filosofia do MVP:** simplicidade primeiro. Cada sprint entrega um pedaço **funcional e testável** ponta a ponta. Nada de otimização precoce, nada de serviço a mais "por garantia".
 
+## Status atual
+
+> **Próxima etapa: Sprint 2.5 — Robustez & Observabilidade**
+
+| Sprint | Status |
+|--------|--------|
+| Sprint 0 — Fundação | ✅ Concluída |
+| Sprint 1 — Cadastro de usuários | ✅ Concluída |
+| Sprint 2 — Pagamentos + worker assíncrono | ✅ Concluída |
+| Sprint 2.5 — Robustez & Observabilidade | ⏳ Próxima |
+| Sprint 3 — Consulta de pagamentos | 🔲 Pendente |
+| Sprint 4 — Painel administrativo | 🔲 Pendente |
+| Sprint 5 — Testes de carga | 🔲 Pendente |
+| Sprint 5.5 — Tuning | 🔲 Pendente |
+| Sprint 6 — Documentação final e entrega | 🔲 Pendente |
+
 ---
 
 ## Convenção de localização das tarefas
