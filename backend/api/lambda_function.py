@@ -4,7 +4,6 @@ import uuid
 from datetime import datetime, timezone
 
 import boto3
-from boto3.dynamodb.conditions import Key
 
 dynamodb = boto3.resource("dynamodb", region_name=os.environ.get("AWS_REGION", "us-east-1"))
 sqs = boto3.client("sqs", region_name=os.environ.get("AWS_REGION", "us-east-1"))
@@ -82,7 +81,8 @@ def create_payment(event, context):
     amount = body.get("amount")
     currency = body.get("currency", "").strip()
     description = body.get("description", "").strip()
-    idempotency_key = (event.get("headers") or {}).get("Idempotency-Key", "").strip()
+    headers = {k.lower(): v for k, v in (event.get("headers") or {}).items()}
+    idempotency_key = headers.get("idempotency-key", "").strip()
 
     if not user_id:
         return _response(400, {"error": "missing_field", "message": "userId is required"})
@@ -95,15 +95,12 @@ def create_payment(event, context):
     if not user_result.get("Item"):
         return _response(404, {"error": "not_found", "message": "user not found"})
 
-    if idempotency_key:
-        existing = payments_table.query(
-            IndexName="idempotencyKey-index",
-            KeyConditionExpression=Key("idempotencyKey").eq(idempotency_key),
-        )
-        if existing.get("Items"):
-            return _response(409, existing["Items"][0])
-
     payment_id = f"pay_{uuid.uuid4().hex[:8]}"
+    if idempotency_key:
+        # Use idempotency_key as a deterministic paymentId prefix so the same
+        # key always maps to the same item — collision is caught atomically by DynamoDB.
+        payment_id = f"pay_{idempotency_key[:16]}"
+
     created_at = datetime.now(timezone.utc).isoformat()
 
     item = {
@@ -118,7 +115,14 @@ def create_payment(event, context):
     if idempotency_key:
         item["idempotencyKey"] = idempotency_key
 
-    payments_table.put_item(Item=item)
+    try:
+        payments_table.put_item(
+            Item=item,
+            ConditionExpression="attribute_not_exists(paymentId)",
+        )
+    except dynamodb.meta.client.exceptions.ConditionalCheckFailedException:
+        existing = payments_table.get_item(Key={"paymentId": payment_id})
+        return _response(409, existing.get("Item", {}))
 
     sqs.send_message(
         QueueUrl=payments_queue_url,
