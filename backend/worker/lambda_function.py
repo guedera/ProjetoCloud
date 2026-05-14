@@ -7,6 +7,9 @@ import boto3
 
 dynamodb = boto3.resource("dynamodb", region_name=os.environ.get("AWS_REGION", "us-east-1"))
 payments_table = dynamodb.Table(os.environ["PAYMENTS_TABLE"])
+eventbridge = boto3.client("events", region_name=os.environ.get("AWS_REGION", "us-east-1"))
+
+EVENT_BUS_NAME = os.environ.get("EVENT_BUS_NAME", "payments-events")
 
 
 def process_payment(payment_id):
@@ -18,6 +21,18 @@ def process_payment(payment_id):
         UpdateExpression="SET #s = :status, updatedAt = :updatedAt",
         ExpressionAttributeNames={"#s": "status"},
         ExpressionAttributeValues={":status": status, ":updatedAt": updated_at},
+    )
+
+    event_type = "PaymentApproved" if status == "APPROVED" else "PaymentRejected"
+    eventbridge.put_events(
+        Entries=[
+            {
+                "Source": "payments.worker",
+                "DetailType": event_type,
+                "Detail": json.dumps({"paymentId": payment_id, "status": status, "updatedAt": updated_at}),
+                "EventBusName": EVENT_BUS_NAME,
+            }
+        ]
     )
 
     return status
