@@ -116,6 +116,16 @@ Arquivo de referência: [docs/arquitetura.md](docs/arquitetura.md)
 | Lambda | `payments-worker` | Python 3.12, trigger: `payments-queue`, batch size: 1 |
 | IAM Policy | `lambda-worker-permissions` | `ReceiveMessage` + `DeleteMessage` + `GetQueueAttributes` em `payments-queue`, `UpdateItem` em `Payments` |
 
+### Sprint 2.5
+| Recurso | Nome | Detalhes |
+|---------|------|----------|
+| EventBridge Event Bus | `payments-events` | Event bus customizado para eventos de domínio |
+| EventBridge Rule | `log-payment-events` | Filtra `source: payments.worker`, envia para CloudWatch Logs |
+| CloudWatch Log Group | `/aws/events/payments` | Recebe eventos `PaymentApproved` e `PaymentRejected` |
+| CloudWatch Dashboard | `payments-dashboard` | Latência API Gateway p95, invocações/erros Lambda, profundidade SQS, consumo DynamoDB |
+| CloudWatch Alarm | `sqs-message-age-too-old` | Dispara quando `ApproximateAgeOfOldestMessage` > 60s em `payments-queue` |
+| IAM Policy | `lambda-worker-eventbridge` | `events:PutEvents` em `payments-events` (adicionada ao worker) |
+
 ### Variáveis de ambiente
 
 **payments-api:**
@@ -129,6 +139,7 @@ Arquivo de referência: [docs/arquitetura.md](docs/arquitetura.md)
 | Variável | Valor |
 |----------|-------|
 | `PAYMENTS_TABLE` | `Payments` |
+| `EVENT_BUS_NAME` | `payments-events` |
 
 ---
 
