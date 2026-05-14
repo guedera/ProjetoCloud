@@ -13,6 +13,10 @@ payments_table = dynamodb.Table(os.environ["PAYMENTS_TABLE"])
 payments_queue_url = os.environ["PAYMENTS_QUEUE_URL"]
 
 
+def _log(level, message, **kwargs):
+    print(json.dumps({"level": level, "message": message, **kwargs}))
+
+
 def _response(status_code, body):
     return {
         "statusCode": status_code,
@@ -101,6 +105,7 @@ def create_payment(event, context):
         # key always maps to the same item — collision is caught atomically by DynamoDB.
         payment_id = f"pay_{idempotency_key[:16]}"
 
+    correlation_id = str(uuid.uuid4())
     created_at = datetime.now(timezone.utc).isoformat()
 
     item = {
@@ -126,8 +131,10 @@ def create_payment(event, context):
 
     sqs.send_message(
         QueueUrl=payments_queue_url,
-        MessageBody=json.dumps({"paymentId": payment_id}),
+        MessageBody=json.dumps({"paymentId": payment_id, "correlationId": correlation_id}),
     )
+
+    _log("INFO", "payment created", paymentId=payment_id, userId=user_id, correlationId=correlation_id)
 
     return _response(202, item)
 

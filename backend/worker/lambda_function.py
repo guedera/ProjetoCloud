@@ -12,7 +12,11 @@ eventbridge = boto3.client("events", region_name=os.environ.get("AWS_REGION", "u
 EVENT_BUS_NAME = os.environ.get("EVENT_BUS_NAME", "payments-events")
 
 
-def process_payment(payment_id):
+def _log(level, message, **kwargs):
+    print(json.dumps({"level": level, "message": message, **kwargs}))
+
+
+def process_payment(payment_id, correlation_id):
     status = "APPROVED" if random.random() < 0.8 else "REJECTED"
     updated_at = datetime.now(timezone.utc).isoformat()
 
@@ -29,21 +33,20 @@ def process_payment(payment_id):
             {
                 "Source": "payments.worker",
                 "DetailType": event_type,
-                "Detail": json.dumps({"paymentId": payment_id, "status": status, "updatedAt": updated_at}),
+                "Detail": json.dumps({"paymentId": payment_id, "status": status, "updatedAt": updated_at, "correlationId": correlation_id}),
                 "EventBusName": EVENT_BUS_NAME,
             }
         ]
     )
 
+    _log("INFO", "payment processed", paymentId=payment_id, status=status, correlationId=correlation_id)
+
     return status
 
 
 def lambda_handler(event, context):
-    if os.environ.get("FORCE_FAIL") == "true":
-        raise RuntimeError("FORCE_FAIL enabled — simulating worker crash for DLQ testing")
-
     for record in event["Records"]:
         body = json.loads(record["body"])
         payment_id = body["paymentId"]
-        status = process_payment(payment_id)
-        print(f"payment {payment_id} -> {status}")
+        correlation_id = body.get("correlationId", "")
+        process_payment(payment_id, correlation_id)
