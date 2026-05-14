@@ -39,6 +39,9 @@ def process_payment(payment_id):
 
 
 def lambda_handler(event, context):
+    if os.environ.get("FORCE_FAIL") == "true":
+        raise RuntimeError("FORCE_FAIL enabled — simulating worker crash for DLQ testing")
+
     for record in event["Records"]:
         body = json.loads(record["body"])
         payment_id = body["paymentId"]
