@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Users from './components/Users';
 import CreatePayment from './components/CreatePayment';
 import Payments from './components/Payments';
+import logo from './assets/card.svg';
 import './App.css';
 
 const TABS = [
@@ -16,6 +17,7 @@ export default function App() {
   return (
     <div className="app">
       <header>
+        <img src={logo} alt="logo" style={{ height: 28, width: 28 }} />
         <h1>Painel de Pagamentos</h1>
         <nav>
           {TABS.map(t => (

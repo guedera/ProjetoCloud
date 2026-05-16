@@ -33,6 +33,26 @@ Cadastra um novo usuário.
 
 ---
 
+### GET /users
+Lista todos os usuários cadastrados, ordenados por data de criação.
+
+**Response 200:**
+```json
+{
+  "items": [
+    {
+      "userId": "usr_8e5dd28b",
+      "name": "Guilherme",
+      "email": "gui@teste.com",
+      "createdAt": "2026-05-16T17:45:37.667748+00:00"
+    }
+  ],
+  "count": 1
+}
+```
+
+---
+
 ### GET /users/{id}
 Retorna um usuário pelo ID.
 

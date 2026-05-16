@@ -7,7 +7,7 @@ O objetivo é construir um **MVP** de plataforma de pagamentos na AWS com cadast
 
 ## Status atual
 
-> **Próxima etapa: Sprint 2.5 — Robustez & Observabilidade**
+> **Próxima etapa: Sprint 5 — Testes de carga com JMeter**
 
 | Sprint | Status |
 |--------|--------|
@@ -16,7 +16,7 @@ O objetivo é construir um **MVP** de plataforma de pagamentos na AWS com cadast
 | Sprint 2 — Pagamentos + worker assíncrono | ✅ Concluída |
 | Sprint 2.5 — Robustez & Observabilidade | ✅ Concluída |
 | Sprint 3 — Consulta de pagamentos | ✅ Concluída |
-| Sprint 4 — Painel administrativo | 🔲 Pendente |
+| Sprint 4 — Painel administrativo | ✅ Concluída |
 | Sprint 5 — Testes de carga | 🔲 Pendente |
 | Sprint 5.5 — Tuning | 🔲 Pendente |
 | Sprint 6 — Documentação final e entrega | 🔲 Pendente |
