@@ -131,6 +131,37 @@ export default function Payments() {
           )}
         </div>
       )}
+
+      {listResult && listResult.count > 0 && (() => {
+        const recent = [...listResult.items]
+          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+          .slice(0, 5);
+        return (
+          <div className="card">
+            <div className="card-title">Últimos 5 pagamentos</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {recent.map(p => (
+                <div key={p.paymentId} style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '10px 14px', borderRadius: 8,
+                  background: 'var(--bg)', border: '1px solid var(--border)',
+                }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    <code style={{ fontSize: '0.8rem', color: 'var(--text-h)' }}>{p.paymentId}</code>
+                    <span className="text-muted">{new Date(p.createdAt).toLocaleString('pt-BR')}</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-h)' }}>
+                      {Number(p.amount).toLocaleString('pt-BR', { style: 'currency', currency: p.currency })}
+                    </span>
+                    <StatusBadge status={p.status} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

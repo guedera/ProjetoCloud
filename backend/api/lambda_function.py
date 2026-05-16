@@ -169,12 +169,21 @@ def get_payment(event, context):
     return _response(200, item)
 
 
+def list_users(event, context):
+    result = users_table.scan()
+    items = sorted(result.get("Items", []), key=lambda u: u.get("createdAt", ""))
+    return _response(200, {"items": items, "count": len(items)})
+
+
 def lambda_handler(event, context):
     method = event.get("httpMethod", "")
     path = event.get("path", "")
 
     if method == "POST" and path == "/users":
         return create_user(event, context)
+
+    if method == "GET" and path == "/users":
+        return list_users(event, context)
 
     if method == "GET" and path.startswith("/users/"):
         return get_user(event, context)

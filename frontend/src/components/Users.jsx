@@ -5,9 +5,12 @@ export default function Users() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [lookupId, setLookupId] = useState('');
+  const [search, setSearch] = useState('');
   const [result, setResult] = useState(null);
+  const [userList, setUserList] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [listLoading, setListLoading] = useState(false);
 
   async function handleCreate(e) {
     e.preventDefault();
@@ -15,6 +18,10 @@ export default function Users() {
     try {
       setResult(await api.createUser({ name, email }));
       setName(''); setEmail('');
+      if (userList) {
+        const updated = await api.listUsers();
+        setUserList(updated);
+      }
     } catch (err) {
       setError(`${err.status}: ${err.message}`);
     } finally {
@@ -34,11 +41,29 @@ export default function Users() {
     }
   }
 
+  async function handleListUsers() {
+    setError(''); setListLoading(true);
+    try {
+      setUserList(await api.listUsers());
+    } catch (err) {
+      setError(`${err.status}: ${err.message}`);
+    } finally {
+      setListLoading(false);
+    }
+  }
+
+  const filteredUsers = userList
+    ? userList.items.filter(u =>
+        u.name.toLowerCase().includes(search.toLowerCase()) ||
+        u.email.toLowerCase().includes(search.toLowerCase())
+      )
+    : null;
+
   return (
     <div>
       <div className="section-header">
         <h2>Usuários</h2>
-        <p>Cadastre novos usuários ou consulte os existentes pelo ID.</p>
+        <p>Cadastre novos usuários ou consulte os existentes.</p>
       </div>
 
       <div className="card">
@@ -61,7 +86,7 @@ export default function Users() {
       </div>
 
       <div className="card">
-        <div className="card-title">Consultar usuário</div>
+        <div className="card-title">Consultar por ID</div>
         <form onSubmit={handleGet}>
           <label>User ID
             <input value={lookupId} onChange={e => setLookupId(e.target.value)} placeholder="usr_xxxxxxxx" required />
@@ -75,12 +100,59 @@ export default function Users() {
       </div>
 
       {error && <div className="alert error">{error}</div>}
+
       {result && (
-        <div className="result-block">
+        <div className="result-block" style={{ marginBottom: 16 }}>
           <div className="result-block-header">Resposta</div>
           <pre>{JSON.stringify(result, null, 2)}</pre>
         </div>
       )}
+
+      <div className="card">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: userList ? 14 : 0 }}>
+          <div className="card-title" style={{ margin: 0 }}>Todos os usuários</div>
+          <button className="btn btn-primary" style={{ padding: '6px 14px', fontSize: '0.8rem' }} onClick={handleListUsers} disabled={listLoading}>
+            {listLoading ? 'Carregando…' : userList ? 'Atualizar' : 'Carregar'}
+          </button>
+        </div>
+
+        {userList && (
+          <>
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Filtrar por nome ou e-mail…"
+              style={{ marginBottom: 12 }}
+            />
+            {filteredUsers.length === 0 ? (
+              <div className="empty-state">Nenhum usuário encontrado.</div>
+            ) : (
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>User ID</th>
+                      <th>Nome</th>
+                      <th>E-mail</th>
+                      <th>Criado em</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredUsers.map(u => (
+                      <tr key={u.userId}>
+                        <td><code style={{ fontSize: '0.8rem' }}>{u.userId}</code></td>
+                        <td>{u.name}</td>
+                        <td className="text-muted">{u.email}</td>
+                        <td className="text-muted">{new Date(u.createdAt).toLocaleString('pt-BR')}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }

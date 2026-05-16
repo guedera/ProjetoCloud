@@ -19,6 +19,7 @@ async function request(method, path, body, headers = {}) {
 export const api = {
   createUser: (payload) => request('POST', '/users', payload),
   getUser: (id) => request('GET', `/users/${id}`),
+  listUsers: () => request('GET', '/users'),
 
   createPayment: (payload) => request('POST', '/payments', payload),
   getPayment: (id) => request('GET', `/payments/${id}`),
