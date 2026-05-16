@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime, timezone
 
 import boto3
+from boto3.dynamodb.conditions import Key
 
 dynamodb = boto3.resource("dynamodb", region_name=os.environ.get("AWS_REGION", "us-east-1"))
 sqs = boto3.client("sqs", region_name=os.environ.get("AWS_REGION", "us-east-1"))
@@ -139,6 +140,35 @@ def create_payment(event, context):
     return _response(202, item)
 
 
+def list_payments(event, context):
+    user_id = (event.get("queryStringParameters") or {}).get("userId")
+
+    if not user_id:
+        return _response(400, {"error": "missing_param", "message": "userId query param is required"})
+
+    result = payments_table.query(
+        IndexName="userId-index",
+        KeyConditionExpression=Key("userId").eq(user_id),
+    )
+
+    return _response(200, {"items": result.get("Items", []), "count": result.get("Count", 0)})
+
+
+def get_payment(event, context):
+    payment_id = (event.get("pathParameters") or {}).get("id")
+
+    if not payment_id:
+        return _response(400, {"error": "missing_param", "message": "id is required"})
+
+    result = payments_table.get_item(Key={"paymentId": payment_id})
+    item = result.get("Item")
+
+    if not item:
+        return _response(404, {"error": "not_found", "message": "payment not found"})
+
+    return _response(200, item)
+
+
 def lambda_handler(event, context):
     method = event.get("httpMethod", "")
     path = event.get("path", "")
@@ -151,5 +181,11 @@ def lambda_handler(event, context):
 
     if method == "POST" and path == "/payments":
         return create_payment(event, context)
+
+    if method == "GET" and path == "/payments":
+        return list_payments(event, context)
+
+    if method == "GET" and path.startswith("/payments/"):
+        return get_payment(event, context)
 
     return _response(404, {"error": "not_found", "message": "route not found"})
