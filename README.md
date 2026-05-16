@@ -15,7 +15,7 @@ O objetivo é construir um **MVP** de plataforma de pagamentos na AWS com cadast
 | Sprint 1 — Cadastro de usuários | ✅ Concluída |
 | Sprint 2 — Pagamentos + worker assíncrono | ✅ Concluída |
 | Sprint 2.5 — Robustez & Observabilidade | ✅ Concluída |
-| Sprint 3 — Consulta de pagamentos | 🔲 Pendente |
+| Sprint 3 — Consulta de pagamentos | ✅ Concluída |
 | Sprint 4 — Painel administrativo | 🔲 Pendente |
 | Sprint 5 — Testes de carga | 🔲 Pendente |
 | Sprint 5.5 — Tuning | 🔲 Pendente |
