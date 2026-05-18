@@ -174,11 +174,13 @@ junit.xml
 
 # Resultados de execução não vão para o repo (apenas os planos .jmx vão)
 load-tests/results/
+load-tests/resultados/
 load-tests/**/*.jtl
 load-tests/**/*.csv
 !load-tests/**/sample-*.csv
 load-tests/**/report/
 load-tests/**/reports/
+load-tests/**/relatorio-*/
 load-tests/**/output/
 jmeter.log
 jmeter-server.log
