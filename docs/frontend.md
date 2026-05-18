@@ -62,13 +62,13 @@ npm run build
 
 Os arquivos gerados ficam em `frontend/dist/`. Para atualizar o S3, faça upload manual pelo console AWS:
 
-1. Acesse o bucket **pagamentos-frontend** → aba **Objects**
+1. Acesse o bucket do frontend no S3 → aba **Objects**
 2. Delete os arquivos antigos
 3. Faça upload do `index.html` e da pasta `assets/` de dentro de `dist/`
 
-Ou, se tiver o AWS CLI configurado:
+Ou, se tiver o AWS CLI configurado (substitua `<nome-do-bucket>` pelo nome real):
 ```bash
-aws s3 sync dist/ s3://pagamentos-frontend --delete
+aws s3 sync dist/ s3://<nome-do-bucket> --delete
 ```
 
 ---

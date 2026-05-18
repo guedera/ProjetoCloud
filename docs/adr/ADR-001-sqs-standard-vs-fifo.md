@@ -1,8 +1,5 @@
 # ADR-001 — SQS Standard vs FIFO
 
-**Data:** 2026-05-14  
-**Status:** Aceito
-
 ## Contexto
 
 O sistema de pagamentos precisa de uma fila para desacoplar a criação do pagamento (API síncrona) do seu processamento (worker assíncrono). A AWS oferece dois tipos de fila SQS:

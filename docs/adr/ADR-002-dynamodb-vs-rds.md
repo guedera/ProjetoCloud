@@ -1,8 +1,5 @@
 # ADR-002 — DynamoDB vs RDS
 
-**Data:** 2026-05-14  
-**Status:** Aceito
-
 ## Contexto
 
 O sistema precisa persistir dois tipos de dado: usuários e pagamentos. Precisamos escolher entre um banco relacional gerenciado (RDS) e um banco NoSQL de chave-valor (DynamoDB).

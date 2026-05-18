@@ -1,230 +1,163 @@
 # Plataforma Escalável em Nuvem para Processamento de Pagamentos — MVP
 
 Projeto da disciplina de Computação em Nuvem (Insper, 1º semestre de 2026).
-O objetivo é construir um **MVP** de plataforma de pagamentos na AWS com cadastro de usuários, criação de pagamentos, processamento assíncrono via fila e consulta de status, acompanhada de um painel administrativo simples e testes de carga com JMeter.
 
-> **Filosofia do MVP:** simplicidade primeiro. Cada sprint entrega um pedaço **funcional e testável** ponta a ponta. Nada de otimização precoce, nada de serviço a mais "por garantia".
-
-## Status atual
-
-> **Próxima etapa: Sprint 5 — Testes de carga com JMeter**
-
-| Sprint | Status |
-|--------|--------|
-| Sprint 0 — Fundação | ✅ Concluída |
-| Sprint 1 — Cadastro de usuários | ✅ Concluída |
-| Sprint 2 — Pagamentos + worker assíncrono | ✅ Concluída |
-| Sprint 2.5 — Robustez & Observabilidade | ✅ Concluída |
-| Sprint 3 — Consulta de pagamentos | ✅ Concluída |
-| Sprint 4 — Painel administrativo | ✅ Concluída |
-| Sprint 5 — Testes de carga | 🔲 Pendente |
-| Sprint 5.5 — Tuning | 🔲 Pendente |
-| Sprint 6 — Documentação final e entrega | 🔲 Pendente |
+Plataforma de pagamentos construída na AWS com arquitetura serverless, processamento assíncrono via fila e painel administrativo web. Desenvolvida como MVP com foco em escalabilidade, observabilidade e decisões técnicas justificadas.
 
 ---
 
-## Convenção de localização das tarefas
+## O que o sistema faz
 
-Cada item de cada sprint indica **ONDE** ele é feito:
-
-- 🟦 **[AWS Console]** — configurado manualmente na interface web da AWS (console.aws.amazon.com).
-- 🟩 **[Repositório]** — código/arquivos versionados neste repositório Git.
-- 🟨 **[Local]** — executado na máquina do desenvolvedor (testes, scripts, JMeter).
-- 🟪 **[Documentação]** — escrito em arquivos `.md` dentro de [docs/](docs/).
+- Cadastro e consulta de usuários
+- Criação de pagamentos com processamento assíncrono (fila SQS → worker Lambda)
+- Consulta de status de pagamentos (`PENDING` → `APPROVED` / `REJECTED`)
+- Publicação de eventos de domínio (`PaymentApproved`, `PaymentRejected`) no EventBridge
+- Painel administrativo web (React + Vite) hospedado no S3
+- Idempotência via `Idempotency-Key` para evitar pagamentos duplicados em retries
+- Observabilidade com logs estruturados, dashboard e alarmes no CloudWatch
 
 ---
 
-## Estrutura prevista do repositório (será criada ao longo das sprints)
+## Arquitetura
+
 
 ```
-ProjetoCloud/
-├── README.md                  ← este arquivo (visão geral + sprints)
-├── backend/                   ← código das Lambdas (API + worker)
-│   ├── api/
-│   └── worker/
-├── frontend/                  ← painel administrativo
-├── infra/                     ← anotações/diagramas da infraestrutura AWS
-├── load-tests/                ← planos JMeter (.jmx) e resultados
-└── docs/                      ← documentação técnica e relatório final
-    └── adr/                   ← Architecture Decision Records (decisões justificadas)
+┌─────────────────────────────────────────────────────────────────────────┐
+│                              Cliente / Painel                           │
+│                         (browser ou curl/Postman)                       │
+└──────────────────────────────────┬──────────────────────────────────────┘
+                                   │ HTTPS
+                                   ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                          API Gateway (REST)                             │
+│                                                                         │
+│  POST /users          GET /users/{id}                                   │
+│  POST /payments       GET /payments/{id}      GET /payments?userId=...  │
+└──────┬──────────────────────────────────────────────────────────────────┘
+       │ invoke (sync)
+       ▼
+┌──────────────────────────────────┐
+│        Lambda — API Handler      │
+│  (Python/Node, us-east-1)        │
+│                                  │
+│  createUser  / getUser           │
+│  createPayment / getPayment      │
+│  listPayments                    │
+└───┬───────────────┬──────────────┘
+    │ PutItem/Get   │ SendMessage
+    │               │
+    ▼               ▼
+┌──────────────┐  ┌──────────────────────────────┐
+│   DynamoDB   │  │          SQS                 │
+│              │  │                              │
+│  ┌─────────┐ │  │  payments-queue (Standard)   │
+│  │  Users  │ │  │  payments-dlq  (DLQ)         │
+│  └─────────┘ │  └──────────────┬───────────────┘
+│  ┌─────────┐ │                 │ trigger (event source mapping)
+│  │Payments │ │                 ▼
+│  └─────────┘ │  ┌──────────────────────────────┐
+└──────▲───────┘  │      Lambda — Worker         │
+       │          │  (Python/Node, us-east-1)    │
+       │          │                              │
+       │          │  • consome mensagem SQS      │
+       │          │  • simula aprovação/rejeição │
+       │          │  • UpdateItem → APPROVED     │
+       └──────────│    ou REJECTED               │
+      UpdateItem  │  • publica evento no         │
+                  │    EventBridge               │
+                  └──────────────┬───────────────┘
+                                 │ PutEvents
+                                 ▼
+                  ┌──────────────────────────────┐
+                  │         EventBridge          │
+                  │  PaymentApproved             │
+                  │  PaymentRejected             │
+                  └──────────────┬───────────────┘
+                                 │ regra → log
+                                 ▼
+                  ┌──────────────────────────────┐
+                  │   CloudWatch Logs / Metrics  │
+                  │   Dashboard + Alarmes        │
+                  └──────────────────────────────┘
 ```
 
----
 
-# Sprints
-
-## Sprint 0 — Fundação do projeto
-
-**Objetivo:** preparar conta AWS, organizar repositório e alinhar a arquitetura no papel antes de escrever qualquer código.
-
-| # | Tarefa | Onde |
-|---|--------|------|
-| 0.1 | Criar/validar conta AWS e usuário IAM com permissões mínimas para Lambda, DynamoDB, SQS, API Gateway, CloudWatch e S3. | 🟦 [AWS Console] |
-| 0.2 | Configurar AWS CLI localmente (`aws configure`) com chaves do usuário IAM criado. | 🟨 [Local] |
-| 0.3 | Definir região padrão do projeto (sugestão: `us-east-1`) e documentar. | 🟪 [Documentação] |
-| 0.4 | Criar estrutura de pastas vazia conforme árvore acima (`backend/`, `frontend/`, `infra/`, `load-tests/`, `docs/`). | 🟩 [Repositório] |
-| 0.5 | Desenhar diagrama de arquitetura inicial (API Gateway → Lambda → DynamoDB + SQS → Lambda Worker). | 🟪 [Documentação] em [documents.md](documents.md) |
-| 0.6 | Definir contratos das APIs (rotas, payloads, status codes) — só no papel. | 🟪 [Documentação] em [documents.md](documents.md) |
-
-**Entrega:** repositório organizado, conta AWS pronta, arquitetura desenhada e contratos de API definidos.
+Diagrama completo e fluxo detalhado em [`arquitetura.md`](arquitetura.md).
 
 ---
 
-## Sprint 1 — Cadastro de usuários (primeira fatia ponta a ponta)
+## Serviços AWS utilizados
 
-**Objetivo:** primeira rota funcionando ponta a ponta — `POST /users` e `GET /users/{id}` — para validar a integração API Gateway + Lambda + DynamoDB.
+| Serviço | Papel | Por que foi escolhido |
+|---------|-------|-----------------------|
+| **API Gateway (REST)** | Entrada HTTP pública com CORS | Gerenciado, escala automática, integração nativa com Lambda |
+| **Lambda — API** | Lógica de usuários e pagamentos | Serverless, sem custo em ociosidade, sem servidor para gerenciar |
+| **Lambda — Worker** | Processamento assíncrono dos pagamentos | Desacopla a API do tempo de processamento; escala independente |
+| **DynamoDB** | Persistência de usuários e pagamentos | Serverless, latência baixa, escala automática on-demand, sem VPC obrigatória |
+| **SQS Standard** | Fila de pagamentos + DLQ | Desacoplamento, retry automático, DLQ para falhas; Standard escolhido sobre FIFO por throughput ilimitado e ordem desnecessária (ver ADR-001) |
+| **EventBridge** | Eventos de domínio pós-processamento | Desacoplamento total: novos consumidores sem alterar o worker |
+| **CloudWatch** | Logs, métricas, dashboard, alarmes | Nativo AWS, zero configuração de infra |
+| **S3** | Hospedagem do frontend estático | Simples, barato, sem servidor web |
+| **IAM** | Permissões mínimas por Lambda | Least-privilege: cada Lambda acessa só o que precisa |
 
-| # | Tarefa | Onde |
-|---|--------|------|
-| 1.1 | Criar tabela DynamoDB `Users` com chave primária `userId` (string). | 🟦 [AWS Console] |
-| 1.2 | Implementar Lambda em Python (ou Node.js) com handlers para `createUser` e `getUser`. | 🟩 [Repositório] em [backend/api/](backend/api/) |
-| 1.3 | Empacotar e fazer upload da Lambda (`.zip`) e configurar variáveis de ambiente (nome da tabela, região). | 🟦 [AWS Console] (upload) + 🟩 [Repositório] (código) |
-| 1.4 | Conceder permissão IAM à Lambda para `dynamodb:PutItem` e `dynamodb:GetItem` na tabela `Users`. | 🟦 [AWS Console] |
-| 1.5 | Criar API REST no API Gateway com recursos `/users` (POST) e `/users/{id}` (GET) integrados à Lambda. | 🟦 [AWS Console] |
-| 1.6 | Habilitar CORS no API Gateway (necessário para o painel da Sprint 4). | 🟦 [AWS Console] |
-| 1.7 | Fazer deploy do estágio `dev` no API Gateway e anotar a URL pública. | 🟦 [AWS Console] |
-| 1.8 | Testar com `curl`/Postman e documentar exemplos de requisição/resposta. | 🟨 [Local] + 🟪 [Documentação] |
-
-**Entrega:** consigo cadastrar e consultar um usuário via HTTP real.
-
----
-
-## Sprint 2 — Criação de pagamentos com processamento assíncrono
-
-**Objetivo:** receber pagamentos via API, enfileirar para processamento e ter um worker que consome a fila e atualiza o estado da transação. **Núcleo arquitetural do projeto.**
-
-| # | Tarefa | Onde |
-|---|--------|------|
-| 2.1 | Criar tabela DynamoDB `Payments` com chave primária `paymentId` (string) e atributos como `userId`, `amount`, `status`, `createdAt`. | 🟦 [AWS Console] |
-| 2.2 | Criar fila SQS `payments-queue` (Standard) e uma DLQ associada (`payments-dlq`). | 🟦 [AWS Console] |
-| 2.3 | Implementar handler `createPayment` na Lambda da API: valida payload, grava no DynamoDB com `status=PENDING` e envia mensagem para SQS. | 🟩 [Repositório] em [backend/api/](backend/api/) |
-| 2.4 | Implementar Lambda **worker** que é acionada por mensagens da SQS, simula processamento (ex.: `sleep` aleatório + decisão de sucesso/falha) e atualiza o `status` no DynamoDB para `APPROVED` ou `REJECTED`. | 🟩 [Repositório] em [backend/worker/](backend/worker/) |
-| 2.5 | Criar a Lambda worker no console e configurar **trigger** SQS apontando para `payments-queue`. | 🟦 [AWS Console] |
-| 2.6 | Conceder permissões IAM ao worker (`sqs:ReceiveMessage`, `sqs:DeleteMessage`, `dynamodb:UpdateItem`). | 🟦 [AWS Console] |
-| 2.7 | Adicionar a rota `POST /payments` no API Gateway integrada à Lambda da API. | 🟦 [AWS Console] |
-| 2.8 | Testar fluxo completo: criar pagamento → verificar mensagem na fila → confirmar status atualizado no DynamoDB. | 🟨 [Local] |
-
-**Entrega:** pagamento criado pela API é processado de forma assíncrona pelo worker e tem seu status final persistido.
+Decisões arquiteturais detalhadas em [`docs/adr/`](docs/adr/).
 
 ---
 
-## Sprint 2.5 — Robustez & Observabilidade
+## API
 
-**Objetivo:** elevar a maturidade arquitetural do MVP. A rubrica premia *dificuldade real enfrentada* — esta sprint atinge isso adicionando idempotência, eventos de domínio, observabilidade e decisões registradas.
+Base URL: `https://zll9wu9brj.execute-api.us-east-1.amazonaws.com/dev`
 
-| # | Tarefa | Onde |
-|---|--------|------|
-| 2.5.1 | Implementar **idempotência** em `POST /payments` via header `Idempotency-Key`: gravar no DynamoDB com `ConditionExpression` (`attribute_not_exists`) para evitar pagamentos duplicados em retries. | 🟩 [Repositório] em [backend/api/](backend/api/) |
-| 2.5.2 | Publicar **eventos de domínio** (`PaymentApproved`, `PaymentRejected`) no **EventBridge** a partir do worker, após atualizar o status. | 🟩 [Repositório] em [backend/worker/](backend/worker/) + 🟦 [AWS Console] (event bus) |
-| 2.5.3 | Criar uma regra simples no EventBridge que registre os eventos em um log group do CloudWatch (consumidor de exemplo, demonstra o desacoplamento). | 🟦 [AWS Console] |
-| 2.5.4 | Validar **DLQ**: forçar falhas no worker (ex.: payload inválido) e mostrar mensagens chegando em `payments-dlq`. Documentar como reprocessar. | 🟨 [Local] + 🟪 [Documentação] em [docs/operacao.md](docs/operacao.md) |
-| 2.5.5 | Adicionar **logs estruturados** (JSON) em todas as Lambdas com `correlationId` propagado da API até o worker. | 🟩 [Repositório] |
-| 2.5.6 | Criar **dashboard CloudWatch** com: latência p95/p99 do API Gateway, invocações e erros das Lambdas, `ApproximateNumberOfMessagesVisible` e `ApproximateAgeOfOldestMessage` da SQS, throttling do DynamoDB. | 🟦 [AWS Console] |
-| 2.5.7 | Criar **alarme CloudWatch** em pelo menos uma métrica crítica (ex.: idade da mensagem mais antiga > 60s, ou taxa de erro 5xx > 1%). | 🟦 [AWS Console] |
-| 2.5.8 | Escrever **ADR-001** (SQS Standard vs FIFO) e **ADR-002** (DynamoDB vs RDS) justificando as decisões técnicas. | 🟪 [Documentação] em [docs/adr/](docs/adr/) |
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| `POST` | `/users` | Cadastra usuário |
+| `GET` | `/users` | Lista todos os usuários |
+| `GET` | `/users/{id}` | Busca usuário por ID |
+| `POST` | `/payments` | Cria pagamento (aceita `Idempotency-Key`) |
+| `GET` | `/payments/{id}` | Consulta pagamento e status |
+| `GET` | `/payments?userId=` | Lista pagamentos de um usuário |
 
-**Entrega:** sistema com idempotência, eventos de domínio, DLQ testada, observabilidade real e decisões arquiteturais documentadas.
+Contrato completo em [`docs/api-contract.md`](docs/api-contract.md).
 
 ---
 
-## Sprint 3 — Consulta de pagamentos e listagens
+## Testes de carga
 
-**Objetivo:** completar os fluxos de leitura para que o painel administrativo (Sprint 4) tenha o que exibir.
+Executados com Apache JMeter 5.6.3. Três planos em [`load-tests/`](load-tests/):
 
-| # | Tarefa | Onde |
-|---|--------|------|
-| 3.1 | Implementar handler `getPayment` (`GET /payments/{id}`) — retorna pagamento e status atual. | 🟩 [Repositório] em [backend/api/](backend/api/) |
-| 3.2 | Implementar handler `listPayments` (`GET /payments?userId=...`) — lista pagamentos de um usuário. | 🟩 [Repositório] em [backend/api/](backend/api/) |
-| 3.3 | Avaliar criação de **GSI** (Global Secondary Index) na tabela `Payments` por `userId` para listagem eficiente. | 🟦 [AWS Console] |
-| 3.4 | Adicionar as novas rotas no API Gateway e fazer redeploy do estágio `dev`. | 🟦 [AWS Console] |
-| 3.5 | Atualizar [docs/api-contract.md](docs/api-contract.md) com as novas rotas. | 🟪 [Documentação] |
+| Plano | Cenário | Resultado |
+|-------|---------|-----------|
+| A | 1.000 POSTs em rajada (50 threads) | 50,4 req/s · 505ms avg · 0% erro |
+| B | 1.000 GETs simultâneos (50 threads) | 73,7 req/s · 431ms avg · 0% erro |
+| C | Fluxo misto sustentado por 3 min (50 threads) | 42,2 req/s · 470ms avg · 0% erro |
 
-**Entrega:** API completa com todos os endpoints CRUD necessários para o painel.
+Análise completa em [`docs/relatorio-carga.md`](docs/relatorio-carga.md).
 
 ---
 
-## Sprint 4 — Painel administrativo (frontend)
+## Frontend
 
-**Objetivo:** entregar uma interface simples que demonstre todos os fluxos da plataforma. Estética não é critério; clareza é.
+Painel administrativo em React 19 + Vite, hospedado no S3.
 
-| # | Tarefa | Onde |
-|---|--------|------|
-| 4.1 | Escolher stack mínima (sugestão: HTML + JS puro ou React com Vite) e justificar em [docs/arquitetura.md](docs/arquitetura.md). | 🟪 [Documentação] |
-| 4.2 | Implementar tela de **cadastro de usuários** consumindo `POST /users`. | 🟩 [Repositório] em [frontend/](frontend/) |
-| 4.3 | Implementar tela de **criação de pagamentos** consumindo `POST /payments`. | 🟩 [Repositório] em [frontend/](frontend/) |
-| 4.4 | Implementar tela de **listagem/consulta de pagamentos** com indicador visual de status (PENDING/APPROVED/REJECTED). | 🟩 [Repositório] em [frontend/](frontend/) |
-| 4.5 | (Opcional) Criar bucket S3 com hospedagem estática + CloudFront para servir o painel publicamente. | 🟦 [AWS Console] |
-| 4.6 | Documentar como rodar o frontend localmente apontando para a API real. | 🟪 [Documentação] |
+```bash
+cd frontend
+npm install
+npm run dev   # http://localhost:5173
+```
 
-**Entrega:** painel funcional capaz de exercitar todos os fluxos do sistema.
+Documentação em [`docs/frontend.md`](docs/frontend.md).
 
 ---
 
-## Sprint 5 — Testes de carga com JMeter
+## Documentação
 
-**Objetivo:** simular cenários de estresse e analisar criticamente o comportamento da arquitetura.
-
-| # | Tarefa | Onde |
-|---|--------|------|
-| 5.1 | Instalar Apache JMeter localmente. | 🟨 [Local] |
-| 5.2 | Criar plano de teste **A** — rajada de `POST /payments` (ex.: 1000 requisições, 50 threads). | 🟩 [Repositório] em [load-tests/](load-tests/) (`.jmx`) |
-| 5.3 | Criar plano de teste **B** — consultas simultâneas `GET /payments/{id}`. | 🟩 [Repositório] em [load-tests/](load-tests/) |
-| 5.4 | Criar plano de teste **C** — fluxo misto (criação + consulta) sustentado por alguns minutos. | 🟩 [Repositório] em [load-tests/](load-tests/) |
-| 5.5 | Habilitar métricas no CloudWatch (latência API Gateway, invocações Lambda, mensagens SQS, throttling DynamoDB). | 🟦 [AWS Console] |
-| 5.6 | Executar os planos e exportar relatórios HTML do JMeter. | 🟨 [Local] |
-| 5.7 | Escrever análise crítica: latência, taxa de erro, comportamento da fila sob carga, gargalos identificados. | 🟪 [Documentação] em [docs/relatorio-carga.md](docs/relatorio-carga.md) |
-
-**Entrega:** evidências numéricas + interpretação técnica do comportamento sob carga.
-
----
-
-## Sprint 5.5 — Tuning baseado em carga (antes/depois)
-
-**Objetivo:** transformar o teste de carga em **evidência de engenharia**, não só medição. A rubrica avalia "dificuldade efetivamente enfrentada" — esta sprint mostra um problema identificado, uma intervenção e a validação do resultado.
-
-| # | Tarefa | Onde |
-|---|--------|------|
-| 5.5.1 | A partir do dashboard CloudWatch + relatório JMeter da Sprint 5, **identificar o gargalo principal** (candidatos típicos: Lambda concurrency, DynamoDB throttling, SQS visibility timeout, batch size do worker, cold start). | 🟪 [Documentação] em [docs/relatorio-carga.md](docs/relatorio-carga.md) |
-| 5.5.2 | Escrever **ADR-003** descrevendo o gargalo, hipóteses e a intervenção escolhida. | 🟪 [Documentação] em [docs/adr/](docs/adr/) |
-| 5.5.3 | Aplicar a intervenção. Exemplos: aumentar `reserved concurrency` do worker, mudar DynamoDB para `on-demand`, ajustar `batch size`/`maximum batching window` do trigger SQS, aumentar memória da Lambda, habilitar `provisioned concurrency` na API. | 🟦 [AWS Console] |
-| 5.5.4 | **Re-executar** os mesmos planos JMeter da Sprint 5 e exportar novos relatórios. | 🟨 [Local] |
-| 5.5.5 | Produzir comparativo **antes vs. depois**: gráficos de latência p95/p99, taxa de erro, profundidade da fila. | 🟪 [Documentação] em [docs/relatorio-carga.md](docs/relatorio-carga.md) |
-| 5.5.6 | Concluir com lições aprendidas e próximos limites observados (próximo gargalo se a carga subir mais). | 🟪 [Documentação] |
-
-**Entrega:** evidência concreta de problema → diagnóstico → correção → validação. É isso que move a nota da faixa "funciona" para a faixa "maturidade".
-
----
-
-## Sprint 6 — Documentação final, vídeo e entrega
-
-**Objetivo:** consolidar entregáveis para a apresentação.
-
-| # | Tarefa | Onde |
-|---|--------|------|
-| 6.1 | Finalizar [docs/arquitetura.md](docs/arquitetura.md) com diagrama atualizado e justificativa de cada serviço AWS escolhido. | 🟪 [Documentação] |
-| 6.2 | Escrever relatório técnico consolidado em [docs/relatorio-final.md](docs/relatorio-final.md). | 🟪 [Documentação] |
-| 6.3 | Garantir que README, contratos de API e instruções de execução estão atualizados. | 🟩 [Repositório] |
-| 6.4 | Gravar vídeo de **5 minutos** apresentando arquitetura, demo do painel e resultados dos testes de carga. | 🟨 [Local] |
-| 6.5 | Revisar custos AWS (CloudWatch Billing) e desligar/limpar recursos não usados após a entrega. | 🟦 [AWS Console] |
-
-**Entrega:** projeto pronto para apresentação — código, documentação, testes, vídeo.
-
----
-
-## Resumo do que vive ONDE
-
-| Componente | Onde é feito | Observação |
-|------------|--------------|------------|
-| Tabelas DynamoDB | 🟦 AWS Console | criação manual, sem IaC neste MVP |
-| Filas SQS (+ DLQ) | 🟦 AWS Console | idem |
-| API Gateway (rotas, CORS, deploy) | 🟦 AWS Console | idem |
-| Permissões IAM | 🟦 AWS Console | idem |
-| Código das Lambdas (API + worker) | 🟩 Repositório | upload do `.zip` é feito no console |
-| Frontend (painel) | 🟩 Repositório | hospedagem opcional em S3 (🟦) |
-| Planos de teste JMeter | 🟩 Repositório | execução em 🟨 Local |
-| Diagramas, contratos, relatórios | 🟪 Documentação (`docs/`) | tudo versionado |
-| ADRs (decisões arquiteturais) | 🟪 Documentação (`docs/adr/`) | um arquivo por decisão |
-| EventBridge (event bus + regras) | 🟦 AWS Console | introduzido na Sprint 2.5 |
-| Dashboard e alarmes CloudWatch | 🟦 AWS Console | introduzidos na Sprint 2.5 |
-
----
+| Arquivo | Conteúdo |
+|---------|----------|
+| [`arquitetura.md`](arquitetura.md) | Diagrama, fluxo de dados e infraestrutura criada |
+| [`docs/api-contract.md`](docs/api-contract.md) | Contrato completo da API REST |
+| [`docs/conceitos.md`](docs/conceitos.md) | Explicação de todos os conceitos técnicos do projeto |
+| [`docs/frontend.md`](docs/frontend.md) | Como rodar e publicar o frontend |
+| [`docs/relatorio-carga.md`](docs/relatorio-carga.md) | Resultados e análise dos testes de carga |
+| [`docs/adr/ADR-001`](docs/adr/ADR-001-sqs-standard-vs-fifo.md) | Decisão: SQS Standard vs FIFO |
+| [`docs/adr/ADR-002`](docs/adr/ADR-002-dynamodb-vs-rds.md) | Decisão: DynamoDB vs RDS |
+| [`sprints.md`](sprints.md) | Histórico completo das sprints do projeto |

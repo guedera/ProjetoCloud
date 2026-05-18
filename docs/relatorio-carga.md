@@ -114,4 +114,48 @@ O handler `GET /users` usa `scan` na tabela Users sem paginação. Sob volume ma
 
 ## Conclusão
 
-A arquitetura se comportou dentro do esperado para um MVP sob carga moderada. Os principais limitadores para escala futura são o cold start da Lambda e as operações encadeadas na escrita — ambos endereçáveis com Provisioned Concurrency e otimização do fluxo de validação. A Sprint 5.5 irá tratar esses pontos com intervenções concretas e re-execução dos planos para comparação antes/depois.
+A arquitetura se comportou dentro do esperado para um MVP sob carga moderada. Os principais limitadores para escala futura são o cold start da Lambda e as operações encadeadas na escrita. A seção abaixo documenta as intervenções recomendadas caso o sistema precise evoluir para suportar volumes maiores.
+
+---
+
+## Melhorias recomendadas (tuning futuro)
+
+Com base nos resultados dos três planos de teste, foram identificadas quatro intervenções de alto impacto para uma próxima iteração de otimização:
+
+### 1. Provisioned Concurrency na Lambda da API
+
+**Problema identificado:** o pico de 1.604ms no Plano A ocorreu no início da rajada, quando todas as 50 threads dispararam simultaneamente após o ramp-up. Esse comportamento é característico de cold start — a primeira invocação de uma Lambda em Python inicializa o runtime e importa as dependências, adicionando 300–800ms à latência.
+
+**Intervenção sugerida:** habilitar Provisioned Concurrency na Lambda da API com pelo menos 10 instâncias pré-aquecidas. Isso elimina o cold start para invocações dentro da capacidade provisionada, estabilizando a latência desde a primeira requisição.
+
+**Impacto esperado:** redução do pico de latência de ~1.600ms para ~500ms no início das rajadas, sem alteração de código.
+
+---
+
+### 2. Remover validação síncrona de usuário no `POST /payments`
+
+**Problema identificado:** o handler `create_payment` realiza um `GetItem` no DynamoDB para verificar se o `userId` existe antes de criar o pagamento. Essa chamada adiciona ~100ms a cada criação e aumenta o número de operações encadeadas de 2 para 3 (GetItem + PutItem + SendMessage), elevando a latência média de escrita em relação à leitura.
+
+**Intervenção sugerida:** remover a validação síncrona de usuário da API e delegar essa responsabilidade ao worker. Se o `userId` não existir, o worker rejeita o pagamento com `status=REJECTED` e publica um evento `PaymentRejected` no EventBridge. A API responde 202 imediatamente, sem bloquear na validação.
+
+**Impacto esperado:** redução da latência média do `POST /payments` de ~505ms para ~400ms, alinhando-a com a latência de leitura.
+
+---
+
+### 3. Verificar e migrar DynamoDB para modo on-demand
+
+**Problema identificado:** sob rajada (Plano A, 50 req/s por ~20s), o DynamoDB pode sofrer throttling se a tabela `Payments` estiver configurada com capacidade provisionada fixa abaixo do pico de escrita. Nos testes atuais não houve erros, mas em volumes maiores (ex.: 200 req/s) o throttling se tornaria o principal gargalo.
+
+**Intervenção sugerida:** confirmar que ambas as tabelas (`Users` e `Payments`) estão em modo **on-demand** (pay-per-request). Se estiverem em modo provisionado, migrar para on-demand no console AWS. Essa mudança elimina throttling em picos imprevisíveis sem necessidade de calcular capacidade.
+
+**Impacto esperado:** zero erros de throttling mesmo com rajadas acima de 200 req/s, ao custo de maior preço por operação em volumes altos e constantes.
+
+---
+
+### 4. Aumentar batch size do trigger SQS no worker
+
+**Problema identificado:** o worker Lambda está configurado com batch size padrão de 1 mensagem por invocação. No Plano A, 1.000 mensagens foram enfileiradas em ~20s, gerando 1.000 invocações separadas do worker. Isso aumenta o custo de execução e o tempo total para drenar a fila.
+
+**Intervenção sugerida:** aumentar o batch size do trigger SQS para 10 mensagens e habilitar `Maximum Batching Window` de 5 segundos. O worker já itera sobre `event["Records"]`, então nenhuma mudança de código é necessária. Ajustar o timeout da Lambda para acomodar o processamento do lote.
+
+**Impacto esperado:** redução de 10× no número de invocações do worker, drenagem mais rápida da fila sob carga e menor custo de execução Lambda.
