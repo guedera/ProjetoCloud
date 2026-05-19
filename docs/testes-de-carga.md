@@ -118,7 +118,7 @@ A arquitetura se comportou dentro do esperado para um MVP sob carga moderada. Os
 
 ---
 
-## Melhorias recomendadas (tuning futuro)
+## Possíveis futuras implementações
 
 Com base nos resultados dos três planos de teste, foram identificadas quatro intervenções de alto impacto para uma próxima iteração de otimização:
 
