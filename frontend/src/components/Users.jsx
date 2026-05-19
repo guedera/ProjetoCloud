@@ -4,7 +4,9 @@ import { api } from '../api';
 export default function Users() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [lookupId, setLookupId] = useState('');
+  const [emailSearch, setEmailSearch] = useState('');
+  const [emailResult, setEmailResult] = useState(null);
+  const [emailNotFound, setEmailNotFound] = useState(false);
   const [search, setSearch] = useState('');
   const [result, setResult] = useState(null);
   const [userList, setUserList] = useState(null);
@@ -29,11 +31,17 @@ export default function Users() {
     }
   }
 
-  async function handleGet(e) {
+  async function handleSearchByEmail(e) {
     e.preventDefault();
-    setError(''); setResult(null); setLoading(true);
+    setError(''); setEmailResult(null); setEmailNotFound(false); setLoading(true);
     try {
-      setResult(await api.getUser(lookupId.trim()));
+      const all = await api.listUsers();
+      const found = all.items.find(u => u.email.toLowerCase() === emailSearch.trim().toLowerCase());
+      if (found) {
+        setEmailResult(found);
+      } else {
+        setEmailNotFound(true);
+      }
     } catch (err) {
       setError(`${err.status}: ${err.message}`);
     } finally {
@@ -86,10 +94,10 @@ export default function Users() {
       </div>
 
       <div className="card">
-        <div className="card-title">Consultar por ID</div>
-        <form onSubmit={handleGet}>
-          <label>User ID
-            <input value={lookupId} onChange={e => setLookupId(e.target.value)} placeholder="usr_xxxxxxxx" required />
+        <div className="card-title">Consultar por e-mail</div>
+        <form onSubmit={handleSearchByEmail}>
+          <label>E-mail
+            <input type="email" value={emailSearch} onChange={e => setEmailSearch(e.target.value)} placeholder="joao@email.com" required />
           </label>
           <div className="form-actions">
             <button type="submit" className="btn btn-primary" disabled={loading}>
@@ -97,6 +105,13 @@ export default function Users() {
             </button>
           </div>
         </form>
+        {emailNotFound && <div className="alert error" style={{ marginTop: 12 }}>Nenhum usuário encontrado com este e-mail.</div>}
+        {emailResult && (
+          <div className="result-block" style={{ marginTop: 12 }}>
+            <div className="result-block-header">Usuário encontrado</div>
+            <pre>{JSON.stringify(emailResult, null, 2)}</pre>
+          </div>
+        )}
       </div>
 
       {error && <div className="alert error">{error}</div>}
