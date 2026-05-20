@@ -4,6 +4,8 @@ Projeto da disciplina de Computação em Nuvem (Insper, 1º semestre de 2026).
 
 Plataforma serverless de pagamentos construída inteiramente na AWS, com processamento assíncrono via fila, painel administrativo web e observabilidade nativa. O foco é demonstrar uma arquitetura cloud-native escalável e suas decisões técnicas.
 
+Vídeo demonstrativo: https://youtu.be/cuYXtR2rNTs
+
 ---
 
 ## O que o sistema faz
