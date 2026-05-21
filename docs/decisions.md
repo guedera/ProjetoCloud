@@ -94,6 +94,8 @@ Este documento reúne as principais escolhas técnicas do projeto e a justificat
 
 **Decisão:** CloudWatch nativo.
 
+![alt text](image.png)
+
 **Por quê:**
 
 - **Zero configuração de infraestrutura.** Lambda, API Gateway, SQS e DynamoDB já enviam métricas e logs para o CloudWatch automaticamente — sem agente, sem exportador, sem configuração extra.
@@ -101,6 +103,8 @@ Este documento reúne as principais escolhas técnicas do projeto e a justificat
 - **Custo controlado no MVP.** O nível gratuito da AWS cobre 10 métricas customizadas, 5 GB de logs e 3 dashboards por mês — mais que suficiente para o projeto.
 
 **Alternativa descartada:** Datadog ou Grafana + Prometheus. Teriam mais recursos de visualização, mas exigiriam agentes, exportadores e custo extra — overhead injustificável para um MVP.
+
+
 
 ---
 

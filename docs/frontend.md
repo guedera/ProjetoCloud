@@ -4,7 +4,7 @@
 
 O painel está hospedado publicamente no S3:
 
-**http://pagamentos-frontend.s3-website-us-east-1.amazonaws.com/**
+**http://cloud-engcomp261.s3-website-us-east-1.amazonaws.com/**
 
 ---
 
@@ -30,7 +30,6 @@ O painel está hospedado publicamente no S3:
 ### Consultar Pagamentos
 - Consulta de pagamento por ID (`GET /payments/{id}`) com badge de status
 - Listagem de pagamentos por User ID (`GET /payments?userId=...`) com tabela completa
-- Seção de últimos 5 pagamentos ordenados por data
 
 ---
 
