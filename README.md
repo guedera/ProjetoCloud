@@ -86,3 +86,4 @@ Análise completa em [`docs/testes-de-carga.md`](docs/testes-de-carga.md).
 | [`docs/conceitos.md`](docs/conceitos.md) | Explicação dos conceitos técnicos do projeto |
 | [`docs/frontend.md`](docs/frontend.md) | Como rodar e publicar o frontend |
 | [`docs/testes-de-carga.md`](docs/testes-de-carga.md) | Resultados e análise dos testes de carga |
+
